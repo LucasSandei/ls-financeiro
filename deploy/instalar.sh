@@ -52,6 +52,13 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 docker compose version >/dev/null
 
+# O build do webapp consome bastante memória; em VPS pequena cria 4 GB de swap.
+if [ "$(swapon --show | wc -l)" -eq 0 ] && [ "$(free -m | awk '/Mem:/{print $2}')" -lt 7000 ]; then
+  log "Criando 4 GB de swap"
+  fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+  grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 log "Preparando o .env"
 if [ ! -f .env ]; then
   cp .env.example .env
