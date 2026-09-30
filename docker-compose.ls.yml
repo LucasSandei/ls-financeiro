@@ -1,0 +1,120 @@
+# Complemento do docker-compose.prod.yml com o que é próprio do LS Financeiro:
+# webapp em pt-BR (build do nosso fork), HTTPS automático, WhatsApp e agente.
+#
+# Uso (na VPS, na raiz do repositório):
+#   docker compose -f docker-compose.prod.yml -f docker-compose.ls.yml up -d --build
+
+services:
+  # O proxy do Bigcapital deixa de ser publicado; o Caddy fica na frente com HTTPS.
+  proxy:
+    ports: !reset []
+
+  # Webapp construído a partir deste fork (tradução pt-BR). Não pode ser trocado
+  # automaticamente pela imagem oficial, por isso o watchtower fica desligado para ele.
+  webapp:
+    image: ls-financeiro-webapp:local
+    build:
+      context: ./
+      dockerfile: packages/webapp/Dockerfile
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  caddy:
+    container_name: ls-caddy
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      - DOMINIO_APP=${DOMINIO_APP:?Defina DOMINIO_APP no .env}
+      - DOMINIO_WHATSAPP=${DOMINIO_WHATSAPP:?Defina DOMINIO_WHATSAPP no .env}
+      - EMAIL_SSL=${EMAIL_SSL:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - proxy
+      - evolution
+    networks:
+      - bigcapital_network
+
+  evolution-postgres:
+    container_name: ls-evolution-postgres
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=evolution
+      - POSTGRES_PASSWORD=${EVOLUTION_DB_PASSWORD:?Defina EVOLUTION_DB_PASSWORD no .env}
+      - POSTGRES_DB=evolution
+    volumes:
+      - evolution_postgres:/var/lib/postgresql/data
+    networks:
+      - bigcapital_network
+
+  evolution:
+    container_name: ls-evolution
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: unless-stopped
+    depends_on:
+      - evolution-postgres
+      - redis
+    environment:
+      - SERVER_URL=https://${DOMINIO_WHATSAPP}
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:?Defina EVOLUTION_API_KEY no .env}
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:${EVOLUTION_DB_PASSWORD}@evolution-postgres:5432/evolution?schema=evolution_api
+      - DATABASE_CONNECTION_CLIENT_NAME=ls_financeiro
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=false
+      - DATABASE_SAVE_DATA_CONTACTS=false
+      - DATABASE_SAVE_DATA_CHATS=false
+      - DATABASE_SAVE_DATA_HISTORIC=false
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379/6
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_LOCAL_ENABLED=false
+      - CONFIG_SESSION_PHONE_CLIENT=LS Financeiro
+      - CONFIG_SESSION_PHONE_NAME=Chrome
+      - DEL_INSTANCE=false
+      - LANGUAGE=pt-BR
+      - TZ=America/Sao_Paulo
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - bigcapital_network
+
+  agente-whatsapp:
+    container_name: ls-agente-whatsapp
+    build:
+      context: ./integrations/agente-whatsapp
+    restart: unless-stopped
+    depends_on:
+      - server
+      - evolution
+    environment:
+      - PORT=3100
+      - BIGCAPITAL_API_URL=http://server:3000/api
+      - EVOLUTION_API_URL=http://evolution:8080
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE:-financeiro}
+      - WEBHOOK_TOKEN=${AGENTE_WEBHOOK_TOKEN:?Defina AGENTE_WEBHOOK_TOKEN no .env}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?Defina ANTHROPIC_API_KEY no .env}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-5}
+      - CLAUDE_EFFORT=${CLAUDE_EFFORT:-low}
+      - TRANSCRIPTION_API_URL=${TRANSCRIPTION_API_URL:-}
+      - TRANSCRIPTION_API_KEY=${TRANSCRIPTION_API_KEY:-}
+      - TRANSCRIPTION_MODEL=${TRANSCRIPTION_MODEL:-whisper-large-v3}
+      - USUARIOS_FILE=/config/usuarios.json
+    volumes:
+      - ./integrations/agente-whatsapp/usuarios.json:/config/usuarios.json:ro
+    networks:
+      - bigcapital_network
+
+volumes:
+  caddy_data:
+  caddy_config:
+  evolution_postgres:
+  evolution_instances:

@@ -1,2 +1,7 @@
 docker/nginx/scripts/build-nginx.sh text eol=lf
 docker/mariadb/docker-entrypoint.sh text eol=lf
+# LS Financeiro: arquivos executados na VPS precisam de LF
+*.sh text eol=lf
+deploy/* text eol=lf
+docker-compose*.yml text eol=lf
+integrations/** text eol=lf

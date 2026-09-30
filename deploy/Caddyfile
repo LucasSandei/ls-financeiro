@@ -1,0 +1,15 @@
+{
+	email {$EMAIL_SSL}
+}
+
+# Sistema financeiro (Bigcapital)
+{$DOMINIO_APP} {
+	encode gzip
+	reverse_proxy proxy:80
+}
+
+# Painel da Evolution API, usado para ler o QR code do WhatsApp.
+# Protegido pela EVOLUTION_API_KEY.
+{$DOMINIO_WHATSAPP} {
+	reverse_proxy evolution:8080
+}

@@ -1,0 +1,10 @@
+[
+  {
+    "telefone": "5511999998888",
+    "nome": "Lucas",
+    "organizacoes": [
+      { "apelido": "empresa", "apiKey": "COLE_AQUI_A_API_KEY_DA_EMPRESA", "padrao": true },
+      { "apelido": "pessoal", "apiKey": "COLE_AQUI_A_API_KEY_PESSOAL" }
+    ]
+  }
+]
