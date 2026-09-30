@@ -12,9 +12,13 @@ import { withDashboardActions } from '@/containers/Dashboard/withDashboardAction
 import { useSplashLoading } from '@/hooks/state';
 
 const SUPPORTED_LOCALES = [
+  { name: 'Português (Brasil)', value: 'pt-BR' },
   { name: 'English', value: 'en' },
   { name: 'العربية', value: 'ar' },
 ];
+
+// LS Financeiro: a interface abre em português, a não ser que ?lang=en seja usado.
+const DEFAULT_LOCALE = 'pt-BR';
 
 /**
  * Retrieve the current local.
@@ -26,7 +30,7 @@ function getCurrentLocal() {
     localStorageLocaleKey: 'lang',
   });
   if (!find(SUPPORTED_LOCALES, { value: currentLocale })) {
-    currentLocale = 'en';
+    currentLocale = DEFAULT_LOCALE;
   }
   return currentLocale;
 }
@@ -72,7 +76,9 @@ function useDocumentDirectionModifier(locale, isRTL) {
 }
 
 function transformMomentLocale(currentLocale) {
-  return currentLocale === 'ar' ? 'ar-ly' : currentLocale;
+  if (currentLocale === 'ar') return 'ar-ly';
+  if (currentLocale === 'pt-BR') return 'pt-br';
+  return currentLocale;
 }
 
 /**
